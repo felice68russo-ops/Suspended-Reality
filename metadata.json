@@ -1,0 +1,7 @@
+{
+  "name": "Liquid Glass Hand Interface",
+  "description": "A webcam-based AR experience where your fingers manipulate a virtual liquid glass surface.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
