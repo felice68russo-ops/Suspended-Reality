@@ -4,12 +4,12 @@ import { Canvas } from '@react-three/fiber';
 import { DEFAULT_PARAMS, HandData } from './types';
 import { FluidScene } from './components/FluidScene';
 import { WebcamHandler } from './components/WebcamHandler';
-import { ControlPanel } from './components/ControlPanel';
 import { AudioManager } from './components/AudioManager';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [params, setParams] = useState(DEFAULT_PARAMS);
+  // Removed setParams as there are no longer controls to change them
+  const [params] = useState(DEFAULT_PARAMS);
   
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,10 +120,6 @@ const App: React.FC = () => {
                 <p><span className="text-yellow-400 font-bold">MODE 3:</span> 食指涂抹 (Smear)</p>
             </div>
           </div>
-        </div>
-
-        <div className="absolute top-6 right-6 pointer-events-auto z-40">
-          <ControlPanel params={params} onChange={setParams} />
         </div>
       </div>
     </div>

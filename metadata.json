@@ -1,5 +1,5 @@
 {
-  "name": "Liquid Glass Hand Interface",
+  "name": "Suspended Reality",
   "description": "A webcam-based AR experience where your fingers manipulate a virtual liquid glass surface.",
   "requestFramePermissions": [
     "camera"
