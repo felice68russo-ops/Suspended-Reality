@@ -22,10 +22,10 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
   const pinchOsc2Ref = useRef<OscillatorNode | null>(null);
   const pinchGainRef = useRef<GainNode | null>(null);
 
-  // 3. Palm (Deep Drone)
-  const palmOscRef = useRef<OscillatorNode | null>(null);
-  const palmFilterRef = useRef<BiquadFilterNode | null>(null);
-  const palmGainRef = useRef<GainNode | null>(null);
+  // 3. Palm (Pure Water Flow)
+  const palmWaterSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const palmWaterFilterRef = useRef<BiquadFilterNode | null>(null);
+  const palmWaterGainRef = useRef<GainNode | null>(null);
 
   useEffect(() => {
     const initAudio = () => {
@@ -41,8 +41,7 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
       masterGain.connect(ctx.destination);
       masterGainRef.current = masterGain;
 
-      // --- 1. SMEAR SYNTH (Matte Friction) ---
-      // Helper: Generate Pink Noise (1/f)
+      // --- SHARED NOISE BUFFER (Pink Noise) ---
       const bufferSize = 2 * ctx.sampleRate;
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
@@ -60,11 +59,11 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
         b6 = white * 0.115926;
       }
 
+      // --- 1. SMEAR SYNTH ---
       const noiseSource = ctx.createBufferSource();
       noiseSource.buffer = noiseBuffer;
       noiseSource.loop = true;
 
-      // Filter Chain for Smear
       const hpFilter = ctx.createBiquadFilter();
       hpFilter.type = 'highpass';
       hpFilter.frequency.value = 150;
@@ -86,13 +85,12 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
       lpFilter.connect(frictionFilter);
       frictionFilter.connect(smearGain);
       smearGain.connect(masterGain);
-
       noiseSource.start();
 
       smearFilterRef.current = frictionFilter;
       smearGainRef.current = smearGain;
 
-      // --- 2. PINCH SYNTH (Tension) ---
+      // --- 2. PINCH SYNTH ---
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
       osc1.type = 'triangle';
@@ -104,7 +102,6 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
       osc1.connect(pinchGain);
       osc2.connect(pinchGain);
       pinchGain.connect(masterGain);
-      
       osc1.start();
       osc2.start();
 
@@ -112,29 +109,30 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
       pinchOsc2Ref.current = osc2;
       pinchGainRef.current = pinchGain;
 
-      // --- 3. PALM SYNTH (Audible Drone) ---
-      // Changed to Triangle + LowPass so it cuts through small speakers
-      const droneOsc = ctx.createOscillator();
-      droneOsc.type = 'triangle'; 
-      droneOsc.frequency.value = 60; // Base frequency
+      // --- 3. PALM SYNTH (Pure Water) ---
+      
+      // Layer A: Water Noise
+      const palmNoiseSource = ctx.createBufferSource();
+      palmNoiseSource.buffer = noiseBuffer; // Reuse pink noise
+      palmNoiseSource.loop = true;
 
-      // Dynamic Filter to control "muffle" effect
-      const droneFilter = ctx.createBiquadFilter();
-      droneFilter.type = 'lowpass';
-      droneFilter.frequency.value = 100; // Starts very muffled
+      const palmFilter = ctx.createBiquadFilter();
+      palmFilter.type = 'lowpass'; 
+      palmFilter.Q.value = 4.0; // Increased Q slightly for more "liquid" resonance
+      palmFilter.frequency.value = 300; 
 
       const palmGain = ctx.createGain();
       palmGain.gain.value = 0;
 
-      droneOsc.connect(droneFilter);
-      droneFilter.connect(palmGain);
+      palmNoiseSource.connect(palmFilter);
+      palmFilter.connect(palmGain);
       palmGain.connect(masterGain);
-      droneOsc.start();
+      palmNoiseSource.start();
 
-      palmOscRef.current = droneOsc;
-      palmFilterRef.current = droneFilter;
-      palmGainRef.current = palmGain;
-
+      palmWaterSourceRef.current = palmNoiseSource;
+      palmWaterFilterRef.current = palmFilter;
+      palmWaterGainRef.current = palmGain;
+      
       isSetupRef.current = true;
     };
 
@@ -219,19 +217,20 @@ export const AudioManager: React.FC<AudioManagerProps> = ({ handDataRef }) => {
         pinchOsc2Ref.current.frequency.setTargetAtTime(targetFreq * 1.02, now, RAMP_TIME); 
     }
 
-    // 3. Palm (Filtered Drone)
-    if (palmGainRef.current && palmOscRef.current && palmFilterRef.current) {
-        const targetVol = maxPalmProximity > 0.01 ? (maxPalmProximity * 0.8) : 0;
+    // 3. Palm (Pure Water Flow)
+    if (palmWaterGainRef.current && palmWaterFilterRef.current) {
+        const isActive = maxPalmProximity > 0.01;
+        // Smoothed volume
+        const targetVol = isActive ? Math.min(maxPalmProximity * 2.5, 1.0) : 0;
         
-        // Pitch Bend: 60Hz -> 80Hz (Subtle)
-        const targetFreq = 60 + (maxPalmProximity * 20); 
+        // --- Water Logic ---
+        // LFO for "flowing" texture
+        const flowLFO = Math.sin(now * 2.5) * 250; 
+        // Filter logic for water sound
+        const waterFreq = 350 + (maxPalmProximity * 600) + flowLFO; 
         
-        // Filter Opening: 100Hz -> 600Hz
-        const targetCutoff = 100 + (maxPalmProximity * 500);
-
-        palmGainRef.current.gain.setTargetAtTime(targetVol, now, 0.2);
-        palmOscRef.current.frequency.setTargetAtTime(targetFreq, now, 0.2);
-        palmFilterRef.current.frequency.setTargetAtTime(targetCutoff, now, 0.2);
+        palmWaterGainRef.current.gain.setTargetAtTime(targetVol, now, 0.3);
+        palmWaterFilterRef.current.frequency.setTargetAtTime(waterFreq, now, 0.2);
     }
   };
 
